@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>양방향 뇌-기계 인터페이스(BCI) 양방향 제어 루프 실험실</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- Google Fonts: Pretendard -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Pretendard', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            bionic: {
+              900: '#070b14',
+              800: '#0d1527',
+              700: '#15223e',
+              cyan: '#00f2fe',
+              blue: '#4facfe',
+              neonPink: '#ff007f',
+              neonGreen: '#00ff87',
+              violet: '#7928ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #070b14; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+    .glass-card {
+      background: rgba(13, 21, 39, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    
+    body {
+      min-height: 100vh;
+      min-height: 100dvh;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      -webkit-tap-highlight-color: transparent;
+    }
+    .touch-btn {
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-bionic-900 text-slate-100 min-h-screen font-sans antialiased selection:bg-bionic-cyan selection:text-black">
+
+  <header class="sticky top-0 z-40 glass-card border-b border-slate-800/80 px-3 sm:px-6 py-2.5">
+    <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2.5">
+      <div class="w-full md:w-auto flex items-center justify-between gap-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-cyan-500/20 shrink-0">
+            <i data-lucide="cpu" class="w-5 h-5 sm:w-6 sm:h-6 text-white"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <h1 class="text-sm sm:text-base font-bold tracking-tight text-white flex items-center gap-1.5">
+                양방향 신경 제어 랩 <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-950 text-bionic-cyan border border-cyan-800">BCI</span>
+              </h1>
+            </div>
+            <p class="text-[11px] text-slate-400 hidden sm:block">사람에서 기계로(Read) × 기계에서 사람으로(Write)의 폐루프</p>
+          </div>
+        </div>
+
+        <!-- Fullscreen Mobile Toggle Button -->
+        <button id="fullscreen-btn" onclick="toggleFullScreen()" title="스마트폰 전체화면 전환" class="px-2.5 py-1.5 rounded-lg bg-slate-800/90 text-cyan-300 border border-slate-700 hover:bg-slate-700/80 active:scale-95 transition-all text-xs flex items-center gap-1 shrink-0 font-medium">
+          <i data-lucide="maximize" id="fullscreen-icon" class="w-4 h-4"></i>
+          <span class="text-[11px]" id="fullscreen-text">전체화면</span>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs with Horizontal Scroll for Mobile -->
+      <nav class="w-full md:w-auto flex items-center gap-1 overflow-x-auto no-scrollbar bg-slate-950/80 p-1 rounded-xl border border-slate-800/90 text-xs shrink-0 py-1 px-1">
+        <button onclick="switchTab('simulator')" id="tab-btn-simulator" class="px-3 py-1.5 rounded-lg font-medium transition-all duration-200 bg-cyan-500/20 text-bionic-cyan border border-cyan-500/30 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+          <i data-lucide="repeat" class="w-3.5 h-3.5"></i>
+          <span>1. 양방향 시뮬레이터</span>
+        </button>
+        <button onclick="switchTab('challenge')" id="tab-btn-challenge" class="px-3 py-1.5 rounded-lg font-medium transition-all duration-200 text-slate-400 hover:text-slate-200 flex items-center gap-1.5 whitespace-nowrap shrink-0">
+          <i data-lucide="gamepad-2" class="w-3.5 h-3.5"></i>
+          <span>2. 종이컵 챌린지</span>
+        </button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5 sm:space-y-6">
+
+    <!-- ================= TAB 1: 양방향 제어 루프 시뮬레이터 ================= -->
+    <section id="tab-simulator" class="space-y-5 sm:space-y-6 transition-all duration-300">
+      
+      <!-- Top Overview Concept Cards -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Human -> Machine Card -->
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-cyan-400 relative overflow-hidden">
+          <div class="absolute -right-8 -bottom-8 w-28 h-28 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20 uppercase tracking-wide">
+                Feedforward Path (Read)
+              </span>
+              <h2 class="text-base font-bold text-white mt-1.5 flex items-center gap-2">
+                1. 사람에서 기계로 <span class="text-xs font-normal text-slate-400">"생각을 행동으로"</span>
+              </h2>
+            </div>
+            <div class="p-2 rounded-xl bg-cyan-500/10 text-bionic-cyan">
+              <i data-lucide="brain-circuit" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center gap-2 text-xs font-medium text-slate-300 flex-wrap">
+            <span class="bg-slate-800 px-2 py-1 rounded">운동 의도 발생</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span class="bg-slate-800 px-2 py-1 rounded">신경신호 디코딩</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span class="bg-cyan-950 text-cyan-200 border border-cyan-800 px-2 py-1 rounded">로봇 의수 제어</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-2.5 leading-relaxed">
+            대뇌 운동 피질에서 발생한 전기신호를 전극으로 읽어내어, 알고리즘이 "손을 쥐어라"라는 모터 각도 명령으로 실시간 번역합니다.
+          </p>
+        </div>
+
+        <!-- Machine -> Human Card -->
+        <div class="glass-card p-5 rounded-2xl border-l-4 border-pink-500 relative overflow-hidden">
+          <div class="absolute -right-8 -bottom-8 w-28 h-28 bg-pink-500/10 rounded-full blur-2xl pointer-events-none"></div>
+          <div class="flex items-start justify-between">
+            <div>
+              <span class="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded bg-pink-500/10 text-pink-300 border border-pink-500/20 uppercase tracking-wide">
+                Feedback Path (Write)
+              </span>
+              <h2 class="text-base font-bold text-white mt-1.5 flex items-center gap-2">
+                2. 기계에서 사람으로 <span class="text-xs font-normal text-slate-400">"기계의 감각을 뇌로"</span>
+              </h2>
+            </div>
+            <div class="p-2 rounded-xl bg-pink-500/10 text-pink-400">
+              <i data-lucide="zap" class="w-6 h-6"></i>
+            </div>
+          </div>
+          <div class="mt-3 flex items-center gap-2 text-xs font-medium text-slate-300 flex-wrap">
+            <span class="bg-slate-800 px-2 py-1 rounded">압력·접촉 감지</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-pink-400"></i>
+            <span class="bg-slate-800 px-2 py-1 rounded">자극 패턴 변환</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5 text-pink-400"></i>
+            <span class="bg-pink-900/60 text-pink-200 border border-pink-700 px-2 py-1 rounded">감각 피드백</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-2.5 leading-relaxed">
+            로봇 손가락 압력 센서의 전압값을 바이페이직(Biphasic) 전기 펄스로 변환하여 대뇌 체감각 피질을 자극, 손끝에 닿는 촉각을 느끼게 합니다.
+          </p>
+        </div>
+      </div>
+
+      <!-- Main Closed-Loop Interactive Simulator Canvas & Controls -->
+      <div class="glass-card p-4 sm:p-6 rounded-2xl border border-slate-800 relative">
+        <div class="flex flex-col lg:flex-row items-start lg:items-center justify-between pb-4 border-b border-slate-800 gap-4">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center gap-2">
+              <i data-lucide="network" class="w-5 h-5 text-bionic-cyan"></i>
+              실시간 양방향 제어 루프 시뮬레이션
+            </h3>
+            <p class="text-xs text-slate-400 mt-0.5">슬라이더를 조작해 의도를 변경하거나, 감각 루프 스위치를 켜고 꺼보세요.</p>
+          </div>
+
+          <!-- Controls Top Bar -->
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800">
+              <span class="text-xs text-slate-400">감각 피드백 루프:</span>
+              <button id="toggle-loop-btn" onclick="toggleFeedbackLoop()" class="px-3 py-1 text-xs font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition-all flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>폐루프 (연결됨)</span>
+              </button>
+            </div>
+            <button onclick="resetSimulator()" class="p-2 text-slate-400 hover:text-white bg-slate-900 border border-slate-800 rounded-xl hover:bg-slate-800 text-xs flex items-center gap-1">
+              <i data-lucide="rotate-ccw" class="w-4 h-4"></i>
+              <span>초기화</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Simulation Interactive Workspace -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 mt-6 items-center">
+          
+          <!-- Left: Human / Brain Station (4 Cols) -->
+          <div class="lg:col-span-4 bg-slate-950/60 rounded-xl p-4 border border-cyan-900/40 relative">
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+                <i data-lucide="brain" class="w-4 h-4"></i> 사용자 뇌 (Brain Unit)
+              </span>
+              <span id="brain-mode-badge" class="text-[10px] px-2 py-0.5 rounded bg-cyan-950 text-cyan-300 border border-cyan-800">
+                운동 의도 활성
+              </span>
+            </div>
+
+            <!-- Brain Diagram & Signal Monitor -->
+            <div class="space-y-3">
+              <!-- Interactive Intent Control Slider -->
+              <div>
+                <div class="flex justify-between text-xs text-slate-300 mb-1">
+                  <span>손 쥐기 의도 (Intention Force)</span>
+                  <span id="intent-val-text" class="font-mono text-cyan-300 font-bold">50%</span>
+                </div>
+                <input type="range" id="intent-slider" min="0" max="100" value="50" oninput="onIntentChange(this.value)" class="w-full accent-cyan-400 cursor-pointer h-2 bg-slate-800 rounded-lg">
+                <div class="flex justify-between text-[10px] text-slate-500 mt-1">
+                  <span>완전 이완 (0%)</span>
+                  <span>적정 힘 (50%)</span>
+                  <span>최대 악력 (100%)</span>
+                </div>
+              </div>
+
+              <!-- Neural Signal Canvas (ECoG) -->
+              <div class="bg-black/80 rounded-lg p-2.5 border border-slate-800">
+                <div class="flex justify-between items-center text-[10px] text-slate-400 mb-1">
+                  <span>운동 피질 신호 (ECoG)</span>
+                  <span class="font-mono text-cyan-400 text-[10px]">64 ch / 1kHz</span>
+                </div>
+                <canvas id="canvas-ecog" width="300" height="60" class="w-full h-14 block rounded bg-slate-950"></canvas>
+              </div>
+
+              <!-- Sensory Cortex Canvas (Feedback) -->
+              <div class="bg-black/80 rounded-lg p-2.5 border border-slate-800">
+                <div class="flex justify-between items-center text-[10px] text-slate-400 mb-1">
+                  <span>체감각 피질 피드백 (자극 유발 전위)</span>
+                  <span id="sensory-status" class="text-[10px] text-pink-400 font-semibold">피드백 수신 중</span>
+                </div>
+                <canvas id="canvas-sensory" width="300" height="60" class="w-full h-14 block rounded bg-slate-950"></canvas>
+              </div>
+
+              <!-- Patient Perception Feeling Box -->
+              <div id="perception-card" class="p-3 rounded-lg bg-slate-900/90 border border-slate-800 text-xs transition-all">
+                <div class="text-[11px] font-semibold text-slate-400 flex items-center gap-1.5">
+                  <i data-lucide="smile" class="w-3.5 h-3.5 text-cyan-400"></i> 환자가 직접 느끼는 감각:
+                </div>
+                <p id="perception-text" class="text-xs text-slate-200 mt-1 font-medium">
+                  "손가락 끝에 단단한 종이 표면의 압력이 부드럽게 느껴집니다."
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Center: Flow Pathway & Decoder (4 Cols) -->
+          <div class="lg:col-span-4 flex flex-col items-center justify-center space-y-4 py-2">
+            <!-- Forward Pathway Card -->
+            <div class="w-full bg-slate-900/80 p-3.5 rounded-xl border border-cyan-500/30 text-xs space-y-2 relative overflow-hidden">
+              <div class="flex items-center justify-between font-semibold text-cyan-300">
+                <span class="flex items-center gap-1"><i data-lucide="binary" class="w-4 h-4"></i> AI 신경 디코더</span>
+                <span class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-cyan-950 border border-cyan-800">신경망 해석</span>
+              </div>
+              <div class="text-slate-300 text-[11px] leading-snug">
+                베타/감마 파 대역폭 추출 $\rightarrow$ 모터 각도 파라미터 생성
+              </div>
+              <div class="w-full bg-slate-950 h-2 rounded-full overflow-hidden">
+                <div id="decoder-progress" class="h-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-150" style="width: 50%;"></div>
+              </div>
+              <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>타깃 토크: <strong id="target-torque" class="text-white">1.8 Nm</strong></span>
+                <span>지연시간: <strong class="text-emerald-400">8.2 ms</strong></span>
+              </div>
+            </div>
+
+            <!-- Visual Flow Animator -->
+            <div class="relative w-full flex items-center justify-between px-6 py-2">
+              <div class="flex flex-col items-center">
+                <i data-lucide="arrow-right-circle" class="w-6 h-6 text-cyan-400 animate-pulse"></i>
+                <span class="text-[10px] text-cyan-400 mt-1 font-mono">명령 전달</span>
+              </div>
+              <div class="h-0.5 flex-1 mx-2 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 relative">
+                <div id="flow-particle" class="w-2.5 h-2.5 rounded-full bg-white absolute -top-1 shadow-[0_0_8px_#fff]"></div>
+              </div>
+              <div class="flex flex-col items-center">
+                <i data-lucide="arrow-left-circle" class="w-6 h-6 text-pink-400 animate-pulse"></i>
+                <span class="text-[10px] text-pink-400 mt-1 font-mono">촉각 피드백</span>
+              </div>
+            </div>
+
+            <!-- Feedback Stimulator Unit Card -->
+            <div id="feedback-hw-card" class="w-full bg-slate-900/80 p-3.5 rounded-xl border border-pink-500/30 text-xs space-y-2">
+              <div class="flex items-center justify-between font-semibold text-pink-300">
+                <span class="flex items-center gap-1"><i data-lucide="radio" class="w-4 h-4"></i> 피드백 펄스 발생기</span>
+                <span id="stim-status-chip" class="font-mono text-[10px] px-1.5 py-0.5 rounded bg-pink-950 text-pink-300 border border-pink-800">작동 중</span>
+              </div>
+              <div class="text-slate-300 text-[11px] leading-snug">
+                압력 전압(0~3.3V) $\rightarrow$ 주파수 변조 펄스 (10~250 Hz)
+              </div>
+              <div class="flex justify-between text-[10px] text-slate-400 font-mono">
+                <span>자극 세기: <strong id="stim-current-val" class="text-pink-400">1.25 mA</strong></span>
+                <span>자극 빈도: <strong id="stim-freq-val" class="text-pink-400">125 Hz</strong></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: Robotic Hand & Object (4 Cols) -->
+          <div class="lg:col-span-4 bg-slate-950/60 rounded-xl p-4 border border-pink-900/40 relative">
+            <div class="flex items-center justify-between mb-2">
+              <span class="text-xs font-bold text-pink-400 flex items-center gap-1.5">
+                <i data-lucide="bot" class="w-4 h-4"></i> 로봇 의수 및 물체 (Actuator)
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono" id="object-type-badge">대상: 종이컵 (허용 압력 40~65%)</span>
+            </div>
+
+            <!-- Target Object Selector Buttons -->
+            <div class="grid grid-cols-3 gap-1.5 mb-3 text-[11px]">
+              <button onclick="selectObject('cup')" id="obj-cup" class="py-1 px-2 rounded bg-cyan-950 text-cyan-300 border border-cyan-700 font-medium text-center">
+                ☕ 종이컵
+              </button>
+              <button onclick="selectObject('egg')" id="obj-egg" class="py-1 px-2 rounded bg-slate-900 text-slate-400 hover:text-white border border-slate-800 font-medium text-center">
+                🥚 달걀
+              </button>
+              <button onclick="selectObject('steel')" id="obj-steel" class="py-1 px-2 rounded bg-slate-900 text-slate-400 hover:text-white border border-slate-800 font-medium text-center">
+                🔩 쇠 구슬
+              </button>
+            </div>
+
+            <!-- Visual Robotic Hand Graphic Canvas -->
+            <div class="bg-black/90 rounded-lg p-2 border border-slate-800 relative overflow-hidden flex flex-col items-center">
+              <canvas id="canvas-robot-hand" width="280" height="150" class="w-full h-36 block"></canvas>
+              <!-- Real-time Pressure Alert Indicator -->
+              <div id="cup-status-alert" class="absolute bottom-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i> 적정 파지력 (안정적 집기)
+              </div>
+            </div>
+
+            <!-- Sensor Live Measurement -->
+            <div class="mt-3 space-y-1.5 text-xs">
+              <div class="flex justify-between text-slate-300">
+                <span>손끝 압력 센서 (FSR Value)</span>
+                <span id="pressure-val-text" class="font-mono text-pink-400 font-bold">50.0 kPa</span>
+              </div>
+              <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+                <div id="pressure-bar" class="h-full bg-gradient-to-r from-cyan-400 via-emerald-400 to-pink-500 transition-all duration-100" style="width: 50%;"></div>
+              </div>
+              <div class="flex justify-between text-[10px] text-slate-500">
+                <span>0 kPa (미접촉)</span>
+                <span class="text-emerald-400 font-medium">안전 영역</span>
+                <span class="text-red-400">100 kPa (파손 위험)</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================= TAB 2: 종이컵 파지 챌린지 (미션 게임) ================= -->
+    <section id="tab-challenge" class="hidden space-y-6 transition-all duration-300">
+      <div class="glass-card p-6 rounded-2xl border border-slate-800">
+        <div class="max-w-3xl mx-auto text-center space-y-2">
+          <span class="px-3 py-1 rounded-full bg-indigo-500/10 text-indigo-400 text-xs font-semibold border border-indigo-500/20">
+            실험 미션: 왜 양방향(Closed-Loop)이어야 하는가?
+          </span>
+          <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            종이컵을 찌그러뜨리지 않고 안전하게 들어 올려라!
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+            감각 피드백이 없는 <strong>단방향(Open-Loop)</strong> 환경과 실시간 촉각 피드백이 뇌로 전달되는 <strong>폐루프(Closed-Loop)</strong> 환경을 각각 체험하고 두 방식의 성공률을 비교해 보세요.
+          </p>
+        </div>
+
+        <!-- Mode Toggle & Scoreboard -->
+        <div class="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-950/80 border border-slate-800">
+          <div class="flex items-center gap-2">
+            <span class="text-xs text-slate-400 font-medium">실험 모드:</span>
+            <div class="inline-flex rounded-lg bg-slate-900 p-1 border border-slate-800">
+              <button onclick="setChallengeMode('open')" id="mode-btn-open" class="px-3 py-1 text-xs font-medium rounded-md transition-all text-slate-400 hover:text-white">
+                단방향 (시각만 의존 / 피드백 OFF)
+              </button>
+              <button onclick="setChallengeMode('closed')" id="mode-btn-closed" class="px-3 py-1 text-xs font-bold rounded-md transition-all bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                폐루프 (양방향 촉각 피드백 ON)
+              </button>
+            </div>
+          </div>
+
+          <!-- Stats Counters -->
+          <div class="flex items-center gap-4 text-xs">
+            <div class="text-center px-3 py-1 bg-slate-900 rounded-lg border border-slate-800">
+              <div class="text-slate-400 text-[10px]">시도 횟수</div>
+              <div id="stat-attempts" class="text-base font-bold text-white font-mono">0</div>
+            </div>
+            <div class="text-center px-3 py-1 bg-slate-900 rounded-lg border border-slate-800">
+              <div class="text-emerald-400 text-[10px]">성공 (집기 성공)</div>
+              <div id="stat-successes" class="text-base font-bold text-emerald-400 font-mono">0</div>
+            </div>
+            <div class="text-center px-3 py-1 bg-slate-900 rounded-lg border border-slate-800">
+              <div class="text-red-400 text-[10px]">실패 (낙하/찌그러짐)</div>
+              <div id="stat-failures" class="text-base font-bold text-red-400 font-mono">0</div>
+            </div>
+            <div class="text-center px-3 py-1 bg-slate-900 rounded-lg border border-slate-800">
+              <div class="text-cyan-400 text-[10px]">성공률</div>
+              <div id="stat-rate" class="text-base font-bold text-cyan-400 font-mono">0%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Interactive Game Arena -->
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
+          <!-- Game Canvas Display (7 Cols) -->
+          <div class="md:col-span-7 bg-black/90 rounded-2xl p-4 border border-slate-800 relative flex flex-col items-center">
+            <div class="w-full flex justify-between items-center text-xs text-slate-400 mb-2">
+              <span class="flex items-center gap-1.5">
+                <i data-lucide="cup-soda" class="w-4 h-4 text-cyan-400"></i> 종이컵 집기 시뮬레이터
+              </span>
+              <span id="game-feedback-badge" class="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800">
+                촉각 햅틱 가이드: 활성화
+              </span>
+            </div>
+
+            <canvas id="canvas-game" width="400" height="240" class="w-full h-56 rounded-xl bg-slate-950 block"></canvas>
+
+            <!-- Haptic Guidance Gauge (Only active in Closed-Loop) -->
+            <div id="haptic-gauge-container" class="w-full mt-3 p-3 bg-slate-900/90 rounded-xl border border-slate-800 transition-all">
+              <div class="flex justify-between text-xs mb-1">
+                <span class="text-pink-300 font-semibold flex items-center gap-1">
+                  <i data-lucide="waves" class="w-3.5 h-3.5"></i> 체감각 피드백 수신 강도:
+                </span>
+                <span id="haptic-force-reading" class="font-mono text-white font-bold">대기 중...</span>
+              </div>
+              <div class="w-full bg-slate-950 h-3 rounded-full overflow-hidden relative border border-slate-800">
+                <!-- Safe Target Zone (45% ~ 65%) -->
+                <div class="absolute left-[45%] w-[20%] h-full bg-emerald-500/30 border-x border-emerald-400"></div>
+                <!-- Dynamic Force Indicator Bar -->
+                <div id="haptic-bar" class="h-full bg-pink-500 transition-all duration-75" style="width: 0%;"></div>
+              </div>
+              <div class="flex justify-between text-[10px] text-slate-400 mt-1">
+                <span class="text-blue-400">미달 (미끄러져 낙하)</span>
+                <span class="text-emerald-400 font-bold">★ 적정 파지 영역 (45%~65%)</span>
+                <span class="text-red-400">초과 (컵 찌그러짐)</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Controller Side (5 Cols) -->
+          <div class="md:col-span-5 space-y-4">
+            <div class="glass-card p-5 rounded-2xl border border-slate-800 space-y-4">
+              <h3 class="text-sm font-bold text-white flex items-center gap-2">
+                <i data-lucide="hand" class="w-4 h-4 text-bionic-cyan"></i>
+                파지력(Grasp Force) 제어
+              </h3>
+              <p class="text-xs text-slate-300 leading-relaxed">
+                마우스나 터치로 <strong class="text-cyan-300">[힘 주기]</strong> 버튼을 꾹 누르고 있다가 <strong>적정 범위에 도달했을 때 손을 떼세요.</strong>
+              </p>
+
+              <!-- Push Button Interaction -->
+              <div class="py-2 flex flex-col items-center gap-3">
+                <button id="grasp-action-btn"
+                  onmousedown="startGrasping(event)"
+                  onmouseup="releaseGrasping(event)"
+                  ontouchstart="startGrasping(event)"
+                  ontouchend="releaseGrasping(event)"
+                  class="touch-btn w-full py-5 sm:py-6 rounded-2xl bg-gradient-to-r from-cyan-600 via-indigo-600 to-purple-600 hover:brightness-110 active:scale-95 transition-all duration-100 shadow-lg shadow-cyan-500/20 text-white font-bold text-base flex flex-col items-center justify-center gap-1 select-none cursor-pointer">
+                  <i data-lucide="shrink" class="w-6 h-6"></i>
+                  <span>누르고 있기 (힘 주기)</span>
+                  <span class="text-[10px] font-normal text-cyan-200">손을 떼면 물체를 들어 올립니다</span>
+                </button>
+              </div>
+
+              <!-- Result Message Box -->
+              <div id="game-result-box" class="p-3.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
+                <div class="font-bold text-slate-300 mb-1 flex items-center gap-1.5">
+                  <i data-lucide="info" class="w-4 h-4 text-cyan-400"></i> 미션 힌트
+                </div>
+                <p id="game-result-desc" class="text-slate-400 leading-normal">
+                  단방향 모드에서는 컵이 찌그러지는지 눈으로만 봐야 해서 실패하기 쉽습니다. 폐루프 모드에서는 촉각 게이지의 안내를 받아보세요!
+                </p>
+              </div>
+
+              <button onclick="resetGameStats()" class="w-full py-2 text-xs text-slate-400 hover:text-white bg-slate-900/80 rounded-lg border border-slate-800 hover:bg-slate-800 transition-colors">
+                통계 점수 초기화
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Global Toast Alerts Container -->
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    // Global Application State
+    const state = {
+      activeTab: 'simulator',
+      intentForce: 50,
+      pressureValue: 50,
+      isFeedbackLoopOpen: true,
+      selectedObject: 'cup',
+      gameMode: 'closed',
+      isGrasping: false,
+      gameForce: 0,
+      attempts: 0,
+      successes: 0,
+      failures: 0,
+      tick: 0
+    };
+
+    const OBJECTS = {
+      cup: { name: '종이컵', min: 40, max: 65, fragile: true, color: '#f8fafc' },
+      egg: { name: '달걀', min: 25, max: 45, fragile: true, color: '#fed7aa' },
+      steel: { name: '쇠 구슬', min: 60, max: 100, fragile: false, color: '#94a3b8' }
+    };
+
+    let cEcog, ctxEcog;
+    let cSensory, ctxSensory;
+    let cHand, ctxHand;
+    let cGame, ctxGame;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+      initAudioContext();
+      initCanvases();
+      initResponsiveCanvas();
+      window.addEventListener('resize', handleCanvasResize);
+      document.addEventListener('fullscreenchange', updateFullscreenButtonState);
+      document.addEventListener('webkitfullscreenchange', updateFullscreenButtonState);
+      requestAnimationFrame(mainAnimationLoop);
+    });
+
+    // Tab Navigation Logic (Tabs 1 and 2 only)
+    function switchTab(tabId) {
+      state.activeTab = tabId;
+      const tabs = ['simulator', 'challenge'];
+      tabs.forEach(t => {
+        const sec = document.getElementById(`tab-${t}`);
+        const btn = document.getElementById(`tab-btn-${t}`);
+        if (t === tabId) {
+          if (sec) sec.classList.remove('hidden');
+          if (btn) {
+            btn.className = "px-3 py-1.5 rounded-lg font-medium transition-all duration-200 bg-cyan-500/20 text-bionic-cyan border border-cyan-500/30 flex items-center gap-1.5 whitespace-nowrap shrink-0";
+          }
+        } else {
+          if (sec) sec.classList.add('hidden');
+          if (btn) {
+            btn.className = "px-3 py-1.5 rounded-lg font-medium transition-all duration-200 text-slate-400 hover:text-slate-200 flex items-center gap-1.5 whitespace-nowrap shrink-0";
+          }
+        }
+      });
+      setTimeout(handleCanvasResize, 60);
+      lucide.createIcons();
+    }
+
+    // Fullscreen API Handling
+    function toggleFullScreen() {
+      const doc = window.document;
+      const docEl = doc.documentElement;
+
+      const requestFullScreen = docEl.requestFullscreen || docEl.webkitRequestFullScreen || docEl.mozRequestFullScreen || docEl.msRequestFullscreen;
+      const cancelFullScreen = doc.exitFullscreen || doc.webkitExitFullscreen || doc.mozCancelFullScreen || doc.msExitFullscreen;
+
+      const isFullScreen = doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement;
+
+      if (!isFullScreen) {
+        if (requestFullScreen) {
+          requestFullScreen.call(docEl).catch(err => {
+            console.warn("Fullscreen request error:", err);
+            showToast("전체화면 알림", "브라우저 보안 설정에 따라 홈 화면 추가(PWA) 시 완벽한 전체화면이 제공됩니다.", "info");
+          });
+        } else {
+          showToast("전체화면 미지원", "현재 브라우저는 Fullscreen API를 지원하지 않습니다.", "info");
+        }
+      } else {
+        if (cancelFullScreen) {
+          cancelFullScreen.call(doc);
+        }
+      }
+    }
+
+    function updateFullscreenButtonState() {
+      const isFullScreen = document.fullscreenElement || document.webkitFullscreenElement;
+      const btnText = document.getElementById('fullscreen-text');
+      const btnIcon = document.getElementById('fullscreen-icon');
+      if (btnText && btnIcon) {
+        if (isFullScreen) {
+          btnText.innerText = "축소";
+          btnIcon.setAttribute('data-lucide', 'minimize');
+        } else {
+          btnText.innerText = "전체화면";
+          btnIcon.setAttribute('data-lucide', 'maximize');
+        }
+        lucide.createIcons();
+      }
+    }
+
+    function handleCanvasResize() {
+      if (cHand) {
+        const rect = cHand.getBoundingClientRect();
+        if (rect.width > 0) {
+          cHand.width = rect.width;
+          cHand.height = 150;
+        }
+      }
+      if (cGame) {
+        const rect = cGame.getBoundingClientRect();
+        if (rect.width > 0) {
+          cGame.width = rect.width;
+          cGame.height = 220;
+        }
+      }
+    }
+
+    function initResponsiveCanvas() {
+      setTimeout(handleCanvasResize, 100);
+    }
+
+    // Audio Synthesizer (No external sound dependencies)
+    let audioCtx = null;
+    function initAudioContext() {
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        audioCtx = new AudioContext();
+      } catch (e) {
+        console.warn("AudioContext not supported");
+      }
+    }
+
+    function playBip(freq = 440, duration = 0.08, type = 'sine', volume = 0.08) {
+      if (!audioCtx) return;
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        gain.gain.setValueAtTime(volume, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function showToast(title, message, type = 'info') {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      const colors = {
+        info: 'border-cyan-500/40 bg-slate-900/95 text-cyan-300',
+        success: 'border-emerald-500/40 bg-slate-900/95 text-emerald-300',
+        error: 'border-red-500/40 bg-slate-900/95 text-red-300',
+      };
+      toast.className = `p-3.5 rounded-xl border ${colors[type] || colors.info} shadow-xl backdrop-blur text-xs flex items-start gap-2.5 transition-all transform translate-y-2 opacity-0 pointer-events-auto max-w-xs`;
+      toast.innerHTML = `
+        <div class="mt-0.5"><i data-lucide="${type === 'success' ? 'check-circle' : type === 'error' ? 'alert-triangle' : 'info'}" class="w-4 h-4"></i></div>
+        <div class="flex-1">
+          <strong class="font-bold block text-white">${title}</strong>
+          <span class="text-slate-300 leading-snug">${message}</span>
+        </div>
+      `;
+      container.appendChild(toast);
+      lucide.createIcons();
+      requestAnimationFrame(() => {
+        toast.classList.remove('translate-y-2', 'opacity-0');
+      });
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'translate-x-4');
+        setTimeout(() => toast.remove(), 300);
+      }, 3500);
+    }
+
+    // Simulator Interactive Logic
+    function onIntentChange(val) {
+      state.intentForce = parseInt(val, 10);
+      document.getElementById('intent-val-text').innerText = `${state.intentForce}%`;
+      document.getElementById('decoder-progress').style.width = `${state.intentForce}%`;
+      document.getElementById('target-torque').innerText = `${(state.intentForce * 0.035).toFixed(1)} Nm`;
+      updateRoboticPressure();
+    }
+
+    function toggleFeedbackLoop() {
+      state.isFeedbackLoopOpen = !state.isFeedbackLoopOpen;
+      const btn = document.getElementById('toggle-loop-btn');
+      const stimChip = document.getElementById('stim-status-chip');
+      const sensoryStatus = document.getElementById('sensory-status');
+      const perceptionCard = document.getElementById('perception-card');
+      const perceptionText = document.getElementById('perception-text');
+
+      if (state.isFeedbackLoopOpen) {
+        btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span><span>폐루프 (연결됨)</span>`;
+        btn.className = "px-3 py-1 text-xs font-semibold rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-500/30 transition-all flex items-center gap-1.5";
+        stimChip.innerText = "작동 중";
+        stimChip.className = "font-mono text-[10px] px-1.5 py-0.5 rounded bg-pink-950 text-pink-300 border border-pink-800";
+        sensoryStatus.innerText = "피드백 수신 중";
+        sensoryStatus.className = "text-[10px] text-pink-400 font-semibold";
+        perceptionCard.className = "p-3 rounded-lg bg-slate-900/90 border border-emerald-500/40 text-xs transition-all";
+        perceptionText.innerText = "손끝에 단단한 표면의 압력이 부드럽게 느껴집니다. 촉각 피드백으로 악력을 안정적으로 유지하고 있습니다.";
+        showToast("폐루프(Closed Loop) 연결", "기계의 압력 센서 데이터가 뇌 체감각 피질로 실시간 피드백됩니다.", "success");
+        playBip(587, 0.1, 'sine');
+      } else {
+        btn.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span><span>단방향 (루프 차단됨)</span>`;
+        btn.className = "px-3 py-1 text-xs font-semibold rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all flex items-center gap-1.5";
+        stimChip.innerText = "차단됨";
+        stimChip.className = "font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700";
+        sensoryStatus.innerText = "피드백 차단됨";
+        sensoryStatus.className = "text-[10px] text-slate-500";
+        perceptionCard.className = "p-3 rounded-lg bg-slate-900/90 border border-amber-500/30 text-xs transition-all";
+        perceptionText.innerText = "촉각이 전혀 느껴지지 않습니다! 눈으로 컵이 찌그러지는지 확인하지 않으면 힘 조절이 불가능합니다.";
+        showToast("피드백 루프 차단", "기계에서 사람으로 오는 촉각 피드백이 끊겨 시각에만 의존해야 합니다.", "error");
+        playBip(220, 0.15, 'sawtooth');
+      }
+    }
+
+    function selectObject(type) {
+      state.selectedObject = type;
+      ['cup', 'egg', 'steel'].forEach(t => {
+        const b = document.getElementById(`obj-${t}`);
+        if (t === type) {
+          b.className = "py-1 px-2 rounded bg-cyan-950 text-cyan-300 border border-cyan-700 font-medium text-center";
+        } else {
+          b.className = "py-1 px-2 rounded bg-slate-900 text-slate-400 hover:text-white border border-slate-800 font-medium text-center";
+        }
+      });
+      const obj = OBJECTS[type];
+      document.getElementById('object-type-badge').innerText = `대상: ${obj.name} (허용 압력 ${obj.min}~${obj.max}%)`;
+      updateRoboticPressure();
+      showToast("잡기 대상 변경", `${obj.name}을(를) 작업 대상으로 선택했습니다.`, "info");
+    }
+
+    function updateRoboticPressure() {
+      state.pressureValue = (state.intentForce * 1.0).toFixed(1);
+      document.getElementById('pressure-val-text').innerText = `${state.pressureValue} kPa`;
+      document.getElementById('pressure-bar').style.width = `${Math.min(100, state.pressureValue)}%`;
+
+      const stimCurrent = (state.pressureValue * 0.025).toFixed(2);
+      const stimFreq = Math.round(20 + state.pressureValue * 2.1);
+      document.getElementById('stim-current-val').innerText = `${stimCurrent} mA`;
+      document.getElementById('stim-freq-val').innerText = `${stimFreq} Hz`;
+
+      const obj = OBJECTS[state.selectedObject];
+      const alertBadge = document.getElementById('cup-status-alert');
+      if (state.pressureValue < obj.min) {
+        alertBadge.innerHTML = `<i data-lucide="arrow-down" class="w-3.5 h-3.5"></i> 힘 부족 (미끄러짐 위험)`;
+        alertBadge.className = "absolute bottom-2 px-3 py-1 rounded-full text-xs font-bold bg-blue-500/20 text-blue-300 border border-blue-500/40 flex items-center gap-1.5";
+      } else if (state.pressureValue > obj.max && obj.fragile) {
+        alertBadge.innerHTML = `<i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i> 과도한 압력 (${obj.name} 파손!)`;
+        alertBadge.className = "absolute bottom-2 px-3 py-1 rounded-full text-xs font-bold bg-red-500/20 text-red-300 border border-red-500/40 flex items-center gap-1.5";
+      } else {
+        alertBadge.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> 적정 파지력 (안정적 집기)`;
+        alertBadge.className = "absolute bottom-2 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1.5";
+      }
+      lucide.createIcons();
+    }
+
+    function resetSimulator() {
+      state.intentForce = 50;
+      document.getElementById('intent-slider').value = 50;
+      onIntentChange(50);
+      if (!state.isFeedbackLoopOpen) toggleFeedbackLoop();
+      showToast("초기화 완료", "시뮬레이터가 기본 설정으로 초기화되었습니다.", "info");
+    }
+
+    function setChallengeMode(mode) {
+      state.gameMode = mode;
+      const btnOpen = document.getElementById('mode-btn-open');
+      const btnClosed = document.getElementById('mode-btn-closed');
+      const hapticContainer = document.getElementById('haptic-gauge-container');
+      const feedbackBadge = document.getElementById('game-feedback-badge');
+
+      if (mode === 'open') {
+        btnOpen.className = "px-3 py-1 text-xs font-bold rounded-md transition-all bg-amber-500/20 text-amber-300 border border-amber-500/40";
+        btnClosed.className = "px-3 py-1 text-xs font-medium rounded-md transition-all text-slate-400 hover:text-white";
+        hapticContainer.classList.add('opacity-20', 'pointer-events-none');
+        feedbackBadge.innerText = "촉각 피드백: 차단됨 (시각만 의존)";
+        feedbackBadge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-amber-950 text-amber-300 border border-amber-800";
+        document.getElementById('haptic-force-reading').innerText = "감각 없음 (0 mA)";
+        showToast("단방향 모드 활성화", "촉각 게이지가 꺼졌습니다. 로봇 손과 컵의 모양만 보고 손을 떼세요!", "info");
+      } else {
+        btnClosed.className = "px-3 py-1 text-xs font-bold rounded-md transition-all bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+        btnOpen.className = "px-3 py-1 text-xs font-medium rounded-md transition-all text-slate-400 hover:text-white";
+        hapticContainer.classList.remove('opacity-20', 'pointer-events-none');
+        feedbackBadge.innerText = "촉각 햅틱 가이드: 활성화";
+        feedbackBadge.className = "px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-800";
+        showToast("폐루프 모드 활성화", "실시간 촉각 피드백이 켜졌습니다. 녹색 안전 영역에서 손을 떼세요.", "success");
+      }
+    }
+
+    let graspInterval = null;
+    function startGrasping(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      state.isGrasping = true;
+      state.gameForce = 0;
+      
+      const btn = document.getElementById('grasp-action-btn');
+      btn.classList.add('scale-95', 'brightness-125');
+
+      if (graspInterval) clearInterval(graspInterval);
+      graspInterval = setInterval(() => {
+        if (state.isGrasping) {
+          state.gameForce += 2.2;
+          if (state.gameForce > 100) state.gameForce = 100;
+          
+          if (state.gameMode === 'closed') {
+            const freq = 180 + state.gameForce * 8;
+            playBip(freq, 0.04, 'triangle', 0.04);
+            document.getElementById('haptic-bar').style.width = `${state.gameForce}%`;
+            document.getElementById('haptic-force-reading').innerText = `${state.gameForce.toFixed(0)}% (자극: ${(state.gameForce * 0.03).toFixed(2)} mA)`;
+          } else {
+            document.getElementById('haptic-bar').style.width = `0%`;
+            document.getElementById('haptic-force-reading').innerText = `[신호 없음]`;
+          }
+        }
+      }, 40);
+    }
+
+    function releaseGrasping(e) {
+      if (e) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+      if (!state.isGrasping) return;
+      state.isGrasping = false;
+      clearInterval(graspInterval);
+
+      const btn = document.getElementById('grasp-action-btn');
+      btn.classList.remove('scale-95', 'brightness-125');
+
+      evaluateGraspResult(state.gameForce);
+    }
+
+    function evaluateGraspResult(force) {
+      state.attempts++;
+      const resultBox = document.getElementById('game-result-box');
+      const resultDesc = document.getElementById('game-result-desc');
+
+      if (force < 45) {
+        state.failures++;
+        playBip(150, 0.3, 'sawtooth', 0.1);
+        resultBox.className = "p-3.5 rounded-xl bg-blue-950/80 border border-blue-500/40 text-xs";
+        resultDesc.innerHTML = `<strong class="text-blue-300">낙하 실패! (파지력 ${force.toFixed(0)}%)</strong><br>힘이 너무 약해 컵이 손가락 사이로 미끄러져 떨어졌습니다. 조금 더 오래 힘을 주어야 합니다.`;
+        showToast("미션 실패: 컵 낙하", "파지력이 부족하여 종이컵이 미끄러졌습니다.", "error");
+      } else if (force > 65) {
+        state.failures++;
+        playBip(120, 0.4, 'sawtooth', 0.15);
+        resultBox.className = "p-3.5 rounded-xl bg-red-950/80 border border-red-500/40 text-xs";
+        resultDesc.innerHTML = `<strong class="text-red-300">파손 실패! (파지력 ${force.toFixed(0)}%)</strong><br>힘이 너무 과해 종이컵이 우그러져 내용물이 쏟아졌습니다!`;
+        showToast("미션 실패: 컵 파손", "과도한 힘으로 종이컵이 찌그러졌습니다.", "error");
+      } else {
+        state.successes++;
+        playBip(659, 0.1, 'sine', 0.1);
+        setTimeout(() => playBip(880, 0.2, 'sine', 0.1), 100);
+        resultBox.className = "p-3.5 rounded-xl bg-emerald-950/80 border border-emerald-500/40 text-xs";
+        resultDesc.innerHTML = `<strong class="text-emerald-300">★ 완벽한 성공! (파지력 ${force.toFixed(0)}%)</strong><br>안전한 적정 파지력으로 종이컵을 찌그러뜨리지 않고 정확하게 들어 올렸습니다!`;
+        showToast("미션 성공!", "적정 파지력으로 종이컵 집기에 성공했습니다!", "success");
+      }
+
+      document.getElementById('stat-attempts').innerText = state.attempts;
+      document.getElementById('stat-successes').innerText = state.successes;
+      document.getElementById('stat-failures').innerText = state.failures;
+      const rate = ((state.successes / state.attempts) * 100).toFixed(0);
+      document.getElementById('stat-rate').innerText = `${rate}%`;
+    }
+
+    function resetGameStats() {
+      state.attempts = 0;
+      state.successes = 0;
+      state.failures = 0;
+      document.getElementById('stat-attempts').innerText = 0;
+      document.getElementById('stat-successes').innerText = 0;
+      document.getElementById('stat-failures').innerText = 0;
+      document.getElementById('stat-rate').innerText = '0%';
+      document.getElementById('haptic-bar').style.width = '0%';
+      document.getElementById('haptic-force-reading').innerText = '대기 중...';
+      showToast("통계 리셋", "시도 횟수와 점수가 초기화되었습니다.", "info");
+    }
+
+    function initCanvases() {
+      cEcog = document.getElementById('canvas-ecog'); if (cEcog) ctxEcog = cEcog.getContext('2d');
+      cSensory = document.getElementById('canvas-sensory'); if (cSensory) ctxSensory = cSensory.getContext('2d');
+      cHand = document.getElementById('canvas-robot-hand'); if (cHand) ctxHand = cHand.getContext('2d');
+      cGame = document.getElementById('canvas-game'); if (cGame) ctxGame = cGame.getContext('2d');
+    }
+
+    function mainAnimationLoop() {
+      state.tick++;
+
+      const flowParticle = document.getElementById('flow-particle');
+      if (flowParticle) {
+        const pct = (Math.sin(state.tick * 0.08) * 0.5 + 0.5) * 88;
+        flowParticle.style.left = `${pct}%`;
+      }
+
+      if (state.activeTab === 'simulator') {
+        drawEcogCanvas();
+        drawSensoryCanvas();
+        drawRobotHandCanvas();
+      } else if (state.activeTab === 'challenge') {
+        drawGameCanvas();
+      }
+
+      requestAnimationFrame(mainAnimationLoop);
+    }
+
+    function drawEcogCanvas() {
+      if (!ctxEcog) return;
+      const w = cEcog.width;
+      const h = cEcog.height;
+      ctxEcog.fillStyle = 'rgba(5, 10, 20, 0.3)';
+      ctxEcog.fillRect(0, 0, w, h);
+
+      ctxEcog.strokeStyle = '#00f2fe';
+      ctxEcog.lineWidth = 1.8;
+      ctxEcog.beginPath();
+      
+      const amp = 8 + (state.intentForce / 100) * 18;
+      const freq = 0.08 + (state.intentForce / 100) * 0.12;
+
+      for (let x = 0; x < w; x += 2) {
+        const noise = (Math.random() - 0.5) * (amp * 0.4);
+        const y = h / 2 + Math.sin(x * freq + state.tick * 0.1) * amp + noise;
+        if (x === 0) ctxEcog.moveTo(x, y);
+        else ctxEcog.lineTo(x, y);
+      }
+      ctxEcog.stroke();
+    }
+
+    function drawSensoryCanvas() {
+      if (!ctxSensory) return;
+      const w = cSensory.width;
+      const h = cSensory.height;
+      ctxSensory.fillStyle = 'rgba(5, 10, 20, 0.3)';
+      ctxSensory.fillRect(0, 0, w, h);
+
+      if (!state.isFeedbackLoopOpen) {
+        ctxSensory.strokeStyle = '#475569';
+        ctxSensory.lineWidth = 1.2;
+        ctxSensory.beginPath();
+        ctxSensory.moveTo(0, h / 2);
+        ctxSensory.lineTo(w, h / 2);
+        ctxSensory.stroke();
+        return;
+      }
+
+      ctxSensory.strokeStyle = '#ff007f';
+      ctxSensory.lineWidth = 1.8;
+      ctxSensory.beginPath();
+
+      const pulseInterval = Math.max(12, Math.round(50 - state.pressureValue * 0.35));
+      for (let x = 0; x < w; x++) {
+        let y = h / 2;
+        const phase = (x + state.tick * 2) % pulseInterval;
+        if (phase === 0) y = h / 2 - 18;
+        else if (phase === 3) y = h / 2 + 18;
+        if (x === 0) ctxSensory.moveTo(x, y);
+        else ctxSensory.lineTo(x, y);
+      }
+      ctxSensory.stroke();
+    }
+
+    function drawRobotHandCanvas() {
+      if (!ctxHand) return;
+      const w = cHand.width;
+      const h = cHand.height;
+      ctxHand.clearRect(0, 0, w, h);
+
+      ctxHand.fillStyle = '#1e293b';
+      ctxHand.strokeStyle = '#38bdf8';
+      ctxHand.lineWidth = 2;
+      ctxHand.fillRect(20, h / 2 - 25, 45, 50);
+      ctxHand.strokeRect(20, h / 2 - 25, 45, 50);
+
+      const obj = OBJECTS[state.selectedObject];
+      const cx = w * 0.68;
+      const cy = h / 2;
+
+      const flex = (state.intentForce / 100);
+      const topFingerY = (cy - 35) + flex * 22;
+      const bottomFingerY = (cy + 35) - flex * 22;
+
+      ctxHand.save();
+      ctxHand.fillStyle = obj.color;
+      ctxHand.strokeStyle = '#64748b';
+      ctxHand.lineWidth = 1.5;
+
+      if (state.selectedObject === 'cup') {
+        let squeeze = 0;
+        if (state.pressureValue > obj.max && obj.fragile) {
+          squeeze = (state.pressureValue - obj.max) * 0.4;
+        }
+        ctxHand.beginPath();
+        ctxHand.moveTo(cx - 16 + squeeze, cy - 25);
+        ctxHand.lineTo(cx + 16 - squeeze, cy - 25);
+        ctxHand.lineTo(cx + 12 - squeeze, cy + 25);
+        ctxHand.lineTo(cx - 12 + squeeze, cy + 25);
+        ctxHand.closePath();
+        ctxHand.fill();
+        ctxHand.stroke();
+      } else if (state.selectedObject === 'egg') {
+        ctxHand.beginPath();
+        ctxHand.ellipse(cx, cy, 14, 20, 0, 0, Math.PI * 2);
+        ctxHand.fill();
+        ctxHand.stroke();
+      } else {
+        ctxHand.beginPath();
+        ctxHand.arc(cx, cy, 18, 0, Math.PI * 2);
+        ctxHand.fill();
+        ctxHand.stroke();
+      }
+      ctxHand.restore();
+
+      ctxHand.strokeStyle = '#00f2fe';
+      ctxHand.lineWidth = 5;
+      ctxHand.lineCap = 'round';
+      ctxHand.beginPath();
+      ctxHand.moveTo(65, cy - 15);
+      ctxHand.lineTo(cx - 22, topFingerY - 8);
+      ctxHand.lineTo(cx - 2, topFingerY);
+      ctxHand.stroke();
+
+      ctxHand.fillStyle = state.pressureValue > 10 ? '#ff007f' : '#64748b';
+      ctxHand.beginPath();
+      ctxHand.arc(cx - 2, topFingerY, 4.5, 0, Math.PI * 2);
+      ctxHand.fill();
+
+      ctxHand.strokeStyle = '#00f2fe';
+      ctxHand.beginPath();
+      ctxHand.moveTo(65, cy + 15);
+      ctxHand.lineTo(cx - 22, bottomFingerY + 8);
+      ctxHand.lineTo(cx - 2, bottomFingerY);
+      ctxHand.stroke();
+
+      ctxHand.fillStyle = state.pressureValue > 10 ? '#ff007f' : '#64748b';
+      ctxHand.beginPath();
+      ctxHand.arc(cx - 2, bottomFingerY, 4.5, 0, Math.PI * 2);
+      ctxHand.fill();
+    }
+
+    function drawGameCanvas() {
+      if (!ctxGame) return;
+      const w = cGame.width;
+      const h = cGame.height;
+      ctxGame.clearRect(0, 0, w, h);
+
+      ctxGame.fillStyle = '#0f172a';
+      ctxGame.fillRect(0, h - 35, w, 35);
+      ctxGame.strokeStyle = '#1e293b';
+      ctxGame.beginPath();
+      ctxGame.moveTo(0, h - 35);
+      ctxGame.lineTo(w, h - 35);
+      ctxGame.stroke();
+
+      const cx = w * 0.55;
+      const currentForce = state.isGrasping ? state.gameForce : 0;
+      const flex = (currentForce / 100);
+
+      const cupY = h - 35 - 35;
+      let deform = 0;
+      if (currentForce > 65) {
+        deform = (currentForce - 65) * 0.45;
+      }
+
+      ctxGame.save();
+      ctxGame.fillStyle = currentForce > 65 ? '#ef4444' : '#f8fafc';
+      ctxGame.strokeStyle = '#94a3b8';
+      ctxGame.lineWidth = 1.5;
+      ctxGame.beginPath();
+      ctxGame.moveTo(cx - 20 + deform, cupY - 30);
+      ctxGame.lineTo(cx + 20 - deform, cupY - 30);
+      ctxGame.lineTo(cx + 15 - deform, cupY + 35);
+      ctxGame.lineTo(cx - 15 + deform, cupY + 35);
+      ctxGame.closePath();
+      ctxGame.fill();
+      ctxGame.stroke();
+
+      ctxGame.fillStyle = currentForce > 65 ? '#ffffff' : '#0f172a';
+      ctxGame.font = '10px Pretendard, sans-serif';
+      ctxGame.textAlign = 'center';
+      ctxGame.fillText(currentForce > 65 ? 'CRUSHED!' : 'CUP', cx, cupY + 8);
+      ctxGame.restore();
+
+      const fingerLeftX = (cx - 45) + flex * 25;
+      const fingerRightX = (cx + 45) - flex * 25;
+
+      ctxGame.strokeStyle = '#38bdf8';
+      ctxGame.lineWidth = 6;
+      ctxGame.lineCap = 'round';
+
+      ctxGame.beginPath();
+      ctxGame.moveTo(cx - 70, cupY - 50);
+      ctxGame.lineTo(fingerLeftX, cupY);
+      ctxGame.stroke();
+
+      ctxGame.beginPath();
+      ctxGame.moveTo(cx + 70, cupY - 50);
+      ctxGame.lineTo(fingerRightX, cupY);
+      ctxGame.stroke();
+
+      ctxGame.fillStyle = state.isGrasping ? (currentForce > 65 ? '#ef4444' : '#00ff87') : '#64748b';
+      ctxGame.beginPath();
+      ctxGame.arc(fingerLeftX, cupY, 6, 0, Math.PI * 2);
+      ctxGame.arc(fingerRightX, cupY, 6, 0, Math.PI * 2);
+      ctxGame.fill();
+
+      ctxGame.fillStyle = '#ffffff';
+      ctxGame.font = '12px monospace';
+      ctxGame.textAlign = 'left';
+      ctxGame.fillText(`Grasp Force: ${currentForce.toFixed(0)}%`, 15, 25);
+    }
+  </script>
+</body>
+</html>
